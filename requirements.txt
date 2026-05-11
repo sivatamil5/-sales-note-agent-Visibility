@@ -3,3 +3,6 @@ groq
 pandas
 python-docx
 PyPDF2
+groq
+pydub
+requests
