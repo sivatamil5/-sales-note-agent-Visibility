@@ -74,7 +74,6 @@ def extract_text_from_image(base64_img):
 def transcribe_video(uploaded_file):
     client = Groq(api_key=groq_key)
 
-    # Save uploaded file to temp location
     suffix = ".mp4" if uploaded_file.name.endswith(".mp4") else ".mp3"
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
         tmp.write(uploaded_file.read())
@@ -147,7 +146,7 @@ Be specific, professional, and actionable.
 """
 
     response = client.chat.completions.create(
-        model="llama3-70b-8192",
+        model="llama-3.3-70b-versatile",
         messages=[{"role": "user", "content": prompt}],
         max_tokens=2000
     )
@@ -175,7 +174,7 @@ with col1:
     transcript_text = ""
 
     if transcript_method == "🎥 Upload video (MP4)":
-        st.info("⚠️ Max file size: 25MB. For larger videos, download just the audio from Teams.")
+        st.info("⚠️ Max file size: 25MB. For larger videos download transcript DOCX from Teams instead.")
         video_file = st.file_uploader(
             "Upload Teams meeting video",
             type=["mp4", "mp3", "m4a", "wav"],
@@ -186,7 +185,7 @@ with col1:
             st.info(f"📁 File size: {file_size:.1f} MB")
 
             if file_size > 25:
-                st.error("❌ File too large! Maximum is 25MB. Please trim the video or export audio only from Teams.")
+                st.error("❌ File too large! Max is 25MB. Please download transcript DOCX from Teams instead.")
             else:
                 with st.spinner("🎙️ Transcribing video... this may take 1-2 minutes..."):
                     try:
@@ -279,7 +278,7 @@ with col2:
         notes_text = st.text_area(
             "Type or paste your sales notes here:",
             height=250,
-            placeholder="e.g. Customer interested in enterprise plan, budget 50k...",
+            placeholder="e.g. Customer interested in enterprise plan, budget 50k, decides end of month...",
             key="n_text"
         )
 
@@ -314,19 +313,21 @@ if st.button("🚀 Run Sales Analysis", use_container_width=True, type="primary"
 # ── Tips ───────────────────────────────────────────────────────
 with st.expander("❓ How to export Teams meeting recording"):
     st.markdown("""
-    **Get video file from Teams:**
+    **Easiest — Download Transcript DOCX from Teams:**
     1. Open Microsoft Teams
     2. Go to the meeting chat
-    3. Click **...** next to the recording
-    4. Click **Download**
-    5. Upload the downloaded MP4 here
+    3. Click the recording
+    4. Click **Transcript** panel on the right
+    5. Click **Download** → saves as `.docx`
+    6. Upload the `.docx` here — instant, no size limit!
 
-    **⚠️ If video is larger than 25MB:**
-    1. Open the recording in Teams
-    2. Click **Transcript** on the right panel
-    3. Click **Download transcript** → saves as DOCX
-    4. Upload the DOCX file instead — much smaller!
+    **Upload Video directly:**
+    1. Go to meeting chat in Teams
+    2. Click **...** next to recording
+    3. Click **Download**
+    4. Upload MP4 here (must be under 25MB)
 
-    **Fastest option:**
-    - Use the **Transcript DOCX** method — instant, no size limit!
+    **⚠️ Video larger than 25MB?**
+    - Use Transcript DOCX method instead
+    - Or trim the video before uploading
     """)
