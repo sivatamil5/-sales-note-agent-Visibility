@@ -4,11 +4,12 @@ import PyPDF2
 import docx
 import io
 import base64
-import PyPDF2
+import tempfile
+import os
 
 st.set_page_config(page_title="Sales Agent", layout="wide")
 st.title("🤝 Sales Agent — powered by Groq AI")
-st.caption("Upload image / transcript / type notes → Get full sales analysis")
+st.caption("Upload video / image / transcript / type notes → Get full sales analysis")
 
 groq_key = st.secrets["GROQ_API_KEY"]
 
@@ -68,6 +69,28 @@ def extract_text_from_image(base64_img):
         max_tokens=1000
     )
     return response.choices[0].message.content
+
+# ── Transcribe video/audio using Groq Whisper ─────────────────
+def transcribe_video(uploaded_file):
+    client = Groq(api_key=groq_key)
+
+    # Save uploaded file to temp location
+    suffix = ".mp4" if uploaded_file.name.endswith(".mp4") else ".mp3"
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        tmp.write(uploaded_file.read())
+        tmp_path = tmp.name
+
+    try:
+        with open(tmp_path, "rb") as f:
+            transcription = client.audio.transcriptions.create(
+                file=(uploaded_file.name, f.read()),
+                model="whisper-large-v3",
+                response_format="text",
+                language="en"
+            )
+        return transcription
+    finally:
+        os.unlink(tmp_path)
 
 # ── Full sales analysis ────────────────────────────────────────
 def run_sales_agent(transcript, notes):
@@ -141,6 +164,7 @@ with col1:
     transcript_method = st.radio(
         "Choose input method:",
         [
+            "🎥 Upload video (MP4)",
             "📷 Upload image of transcript",
             "📁 Upload file (TXT/PDF/DOCX)",
             "✏️ Type or paste manually"
@@ -150,7 +174,30 @@ with col1:
 
     transcript_text = ""
 
-    if transcript_method == "📷 Upload image of transcript":
+    if transcript_method == "🎥 Upload video (MP4)":
+        st.info("⚠️ Max file size: 25MB. For larger videos, download just the audio from Teams.")
+        video_file = st.file_uploader(
+            "Upload Teams meeting video",
+            type=["mp4", "mp3", "m4a", "wav"],
+            key="t_video"
+        )
+        if video_file:
+            file_size = len(video_file.getvalue()) / (1024 * 1024)
+            st.info(f"📁 File size: {file_size:.1f} MB")
+
+            if file_size > 25:
+                st.error("❌ File too large! Maximum is 25MB. Please trim the video or export audio only from Teams.")
+            else:
+                with st.spinner("🎙️ Transcribing video... this may take 1-2 minutes..."):
+                    try:
+                        transcript_text = transcribe_video(video_file)
+                        st.success("✅ Video transcribed successfully!")
+                        with st.expander("👀 View transcript"):
+                            st.text(transcript_text)
+                    except Exception as e:
+                        st.error(f"❌ Transcription failed: {e}")
+
+    elif transcript_method == "📷 Upload image of transcript":
         img_file = st.file_uploader(
             "Upload photo of transcript",
             type=["jpg", "jpeg", "png"],
@@ -232,7 +279,7 @@ with col2:
         notes_text = st.text_area(
             "Type or paste your sales notes here:",
             height=250,
-            placeholder="e.g. Customer interested in enterprise plan, budget 50k, decides end of month...",
+            placeholder="e.g. Customer interested in enterprise plan, budget 50k...",
             key="n_text"
         )
 
@@ -264,25 +311,22 @@ if st.button("🚀 Run Sales Analysis", use_container_width=True, type="primary"
             except Exception as e:
                 st.error(f"❌ Error: {str(e)}")
 
-# ── How to get Teams transcript ────────────────────────────────
-with st.expander("❓ How to get transcript from Microsoft Teams"):
+# ── Tips ───────────────────────────────────────────────────────
+with st.expander("❓ How to export Teams meeting recording"):
     st.markdown("""
-    **Method 1 — Download from Teams:**
+    **Get video file from Teams:**
     1. Open Microsoft Teams
     2. Go to the meeting chat
-    3. Click the recording
-    4. Click **Transcript** on the right panel
-    5. Click **Download** → save as `.docx`
-    6. Upload the `.docx` file here
+    3. Click **...** next to the recording
+    4. Click **Download**
+    5. Upload the downloaded MP4 here
 
-    **Method 2 — Copy and paste:**
-    1. Open the meeting recording in Teams
-    2. Click **Transcript** panel
-    3. Select all → Copy
-    4. Paste in the text area above
+    **⚠️ If video is larger than 25MB:**
+    1. Open the recording in Teams
+    2. Click **Transcript** on the right panel
+    3. Click **Download transcript** → saves as DOCX
+    4. Upload the DOCX file instead — much smaller!
 
-    **Method 3 — Take a photo:**
-    1. Take a photo of your screen showing the transcript
-    2. Upload the image here
-    3. AI will read the text automatically
+    **Fastest option:**
+    - Use the **Transcript DOCX** method — instant, no size limit!
     """)
